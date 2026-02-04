@@ -1,0 +1,12 @@
+{
+  "name": "fishing-macro-qa",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "playwright": "^1.41.2",
+    "dotenv": "^16.4.1"
+  }
+}
