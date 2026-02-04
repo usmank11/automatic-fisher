@@ -32,6 +32,9 @@ class Fisher {
         await this.executeAction(nextAction);
         await this.waitForMessagesSettled(msgCountBefore);
 
+        // Give Discord time to fully render message content
+        await this.wait(0.3);
+
         // Record response time for fish cooldown
         if (nextAction === 'fish') {
           this.lastFishResponseTime = Date.now();
@@ -45,7 +48,6 @@ class Fisher {
 
         // Determine next action based on response
         nextAction = await this.determineNextAction();
-        console.log(`Next action: ${nextAction}`);
 
       } catch (err) {
         console.error('Error in fishing loop:', err.message);
@@ -117,7 +119,7 @@ class Fisher {
 
   /**
    * Detect captcha in recent messages
-   * Returns: { type: 'text', answer: 'XYZ' } or { type: 'image' } or null
+   * Returns: { type: 'text', answer: 'XYZ', fullMessage: '...' } or { type: 'image', fullMessage: '...' } or null
    */
   async detectCaptcha() {
     const messages = await this.getLastMessages(2);
@@ -125,22 +127,36 @@ class Fisher {
 
     if (!captchaMsg) return null;
 
-    console.log('Captcha detected!');
-
     // Text captcha has "Code: XYZ"
     const codeMatch = captchaMsg.match(/Code:\s*(\S+)/i);
     if (codeMatch) {
-      return { type: 'text', answer: codeMatch[1] };
+      return { type: 'text', answer: codeMatch[1], fullMessage: captchaMsg };
     }
 
     // Otherwise it's an image captcha
-    return { type: 'image' };
+    return { type: 'image', fullMessage: captchaMsg };
   }
 
   /**
    * Handle captcha based on type
    */
   async handleCaptcha(captcha) {
+    // Log full captcha message and attachments
+    console.log('\n========== CAPTCHA DETECTED ==========');
+    console.log(`Type: ${captcha.type}`);
+    console.log('\nFull Message Content:');
+    console.log(captcha.fullMessage);
+    
+    // Log any attachments/images
+    const attachments = await this.getCaptchaAttachments();
+    if (attachments.length > 0) {
+      console.log('\nAttachments:');
+      attachments.forEach((att, i) => {
+        console.log(`  [${i}] ${att}`);
+      });
+    }
+    console.log('======================================\n');
+
     if (captcha.type === 'text') {
       console.log(`Solving text captcha: ${captcha.answer}`);
       await this.sendCommandWithParams('/verify', captcha.answer);
@@ -148,6 +164,25 @@ class Fisher {
     } else {
       throw new Error('Image captcha detected - manual intervention required. Terminating.');
     }
+  }
+
+  /**
+   * Get image attachments from last captcha message
+   */
+  async getCaptchaAttachments() {
+    const attachments = [];
+    const elements = this.page.locator('[id*="message-accessories-"]').last();
+    
+    // Look for images within the captcha message
+    const images = await elements.locator('img').all();
+    for (const img of images) {
+      const src = await img.getAttribute('src').catch(() => null);
+      if (src) {
+        attachments.push(src);
+      }
+    }
+    
+    return attachments;
   }
 
   // ============================================
@@ -163,9 +198,35 @@ class Fisher {
   }
 
   /**
-   * Get text content of last message
+   * Get text content of last message (waits for Virtual Fisher response)
    */
   async getLastMessage() {
+    const startTime = Date.now();
+    const timeoutMs = 3000; // 3 second timeout
+
+    // Busy wait for Virtual Fisher response
+    while (Date.now() - startTime < timeoutMs) {
+      const messages = await this.getLastMessages(1);
+      const msg = messages[0] || '';
+      
+      // Check if this looks like a Virtual Fisher response
+      const isVirtualFisherResponse = 
+        msg.includes('You caught') ||       // Fishing result
+        msg.includes('You sold') ||         // Sell confirmation
+        msg.includes('You bought') ||       // Buy confirmation
+        msg.includes('Bait purchase') ||    // Buy confirmation alt
+        msg.includes('You ran out of') ||   // Out of bait
+        msg.includes('Anti-bot');           // Captcha
+      
+      if (isVirtualFisherResponse && msg.length > 10) {
+        return msg;
+      }
+      
+      // Not Virtual Fisher response yet, wait and retry
+      await this.wait(0.1);
+    }
+    
+    // Timeout - return whatever we got (might be Discord UI or empty)
     const messages = await this.getLastMessages(1);
     return messages[0] || '';
   }
@@ -195,7 +256,7 @@ class Fisher {
   /**
    * Wait for messages to settle (no new messages for settleMs)
    */
-  async waitForMessagesSettled(previousCount, settleMs = 500, timeoutMs = 5000) {
+  async waitForMessagesSettled(previousCount, settleMs = 300, timeoutMs = 5000) {
     const startTime = Date.now();
     let lastCount = previousCount;
     let lastChangeTime = Date.now();
@@ -228,7 +289,6 @@ class Fisher {
     const remaining = cooldownMs - elapsed;
 
     if (remaining > 0) {
-      console.log(`Cooldown: ${(remaining / 1000).toFixed(1)}s`);
       await this.wait(remaining / 1000);
     }
   }

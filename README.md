@@ -23,7 +23,7 @@ Automates the Virtual Fisher Discord bot using a state machine:
 
 ## Limitations
 
-- **Image captchas are not supported** - The program will terminate if an image captcha is detected. Text captchas (with "Code: XYZ") are solved automatically.
+- **Image captchas are not supported** - The program will terminate if an image captcha is detected. When any captcha is detected, full details (message content and attachments) are logged to the console. Text captchas (with "Code: XYZ") are solved automatically.
 
 ## Setup
 
@@ -54,7 +54,7 @@ Automates the Virtual Fisher Discord bot using a state machine:
 | `DISCORD_TOKEN` | Your Discord account token    |              |
 | `SERVER_ID`     | Discord server ID             | `1234567890` |
 | `CHANNEL_ID`    | Discord channel ID            | `1234567890` |
-| `FISH_COOLDOWN` | Seconds between fish commands | `2.7`        |
+| `FISH_COOLDOWN` | Seconds between fish commands (from response time) | `2.7`        |
 | `BAIT_TYPE`     | Bait to auto-purchase         | `worms`      |
 
 ## Usage
