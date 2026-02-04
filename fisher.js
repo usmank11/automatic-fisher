@@ -18,7 +18,8 @@ class Fisher {
     this.running = true;
     let nextAction = 'fish';
 
-    console.log(`Starting fishing loop (cooldown: ${this.config.cooldown}s, bait: ${this.config.baitType})`);
+    console.log(`Starting fishing loop (cooldown: ${
+        this.config.cooldown}s, bait: ${this.config.baitType})`);
 
     while (this.running) {
       try {
@@ -119,7 +120,8 @@ class Fisher {
 
   /**
    * Detect captcha in recent messages
-   * Returns: { type: 'text', answer: 'XYZ', fullMessage: '...' } or { type: 'image', fullMessage: '...' } or null
+   * Returns: { type: 'text', answer: 'XYZ', fullMessage: '...' } or { type:
+   * 'image', fullMessage: '...' } or null
    */
   async detectCaptcha() {
     const messages = await this.getLastMessages(2);
@@ -130,11 +132,11 @@ class Fisher {
     // Text captcha has "Code: XYZ"
     const codeMatch = captchaMsg.match(/Code:\s*(\S+)/i);
     if (codeMatch) {
-      return { type: 'text', answer: codeMatch[1], fullMessage: captchaMsg };
+      return {type: 'text', answer: codeMatch[1], fullMessage: captchaMsg};
     }
 
     // Otherwise it's an image captcha
-    return { type: 'image', fullMessage: captchaMsg };
+    return {type: 'image', fullMessage: captchaMsg};
   }
 
   /**
@@ -146,7 +148,7 @@ class Fisher {
     console.log(`Type: ${captcha.type}`);
     console.log('\nFull Message Content:');
     console.log(captcha.fullMessage);
-    
+
     // Log any attachments/images
     const attachments = await this.getCaptchaAttachments();
     if (attachments.length > 0) {
@@ -160,9 +162,10 @@ class Fisher {
     if (captcha.type === 'text') {
       console.log(`Solving text captcha: ${captcha.answer}`);
       await this.sendCommandWithParams('/verify', captcha.answer);
-      await this.wait(1); // Rate limit buffer
+      await this.wait(1);  // Rate limit buffer
     } else {
-      throw new Error('Image captcha detected - manual intervention required. Terminating.');
+      throw new Error(
+          'Image captcha detected - manual intervention required. Terminating.');
     }
   }
 
@@ -172,7 +175,7 @@ class Fisher {
   async getCaptchaAttachments() {
     const attachments = [];
     const elements = this.page.locator('[id*="message-accessories-"]').last();
-    
+
     // Look for images within the captcha message
     const images = await elements.locator('img').all();
     for (const img of images) {
@@ -181,7 +184,7 @@ class Fisher {
         attachments.push(src);
       }
     }
-    
+
     return attachments;
   }
 
@@ -202,30 +205,30 @@ class Fisher {
    */
   async getLastMessage() {
     const startTime = Date.now();
-    const timeoutMs = 3000; // 3 second timeout
+    const timeoutMs = 3000;  // 3 second timeout
 
     // Busy wait for Virtual Fisher response
     while (Date.now() - startTime < timeoutMs) {
       const messages = await this.getLastMessages(1);
       const msg = messages[0] || '';
-      
+
       // Check if this looks like a Virtual Fisher response
-      const isVirtualFisherResponse = 
-        msg.includes('You caught') ||       // Fishing result
-        msg.includes('You sold') ||         // Sell confirmation
-        msg.includes('You bought') ||       // Buy confirmation
-        msg.includes('Bait purchase') ||    // Buy confirmation alt
-        msg.includes('You ran out of') ||   // Out of bait
-        msg.includes('Anti-bot');           // Captcha
-      
+      const isVirtualFisherResponse =
+          msg.includes('You caught') ||      // Fishing result
+          msg.includes('You sold') ||        // Sell confirmation
+          msg.includes('You bought') ||      // Buy confirmation
+          msg.includes('Bait purchase') ||   // Buy confirmation alt
+          msg.includes('You ran out of') ||  // Out of bait
+          msg.includes('Anti-bot');          // Captcha
+
       if (isVirtualFisherResponse && msg.length > 10) {
         return msg;
       }
-      
+
       // Not Virtual Fisher response yet, wait and retry
       await this.wait(0.1);
     }
-    
+
     // Timeout - return whatever we got (might be Discord UI or empty)
     const messages = await this.getLastMessages(1);
     return messages[0] || '';
@@ -256,7 +259,8 @@ class Fisher {
   /**
    * Wait for messages to settle (no new messages for settleMs)
    */
-  async waitForMessagesSettled(previousCount, settleMs = 300, timeoutMs = 5000) {
+  async waitForMessagesSettled(
+      previousCount, settleMs = 300, timeoutMs = 5000) {
     const startTime = Date.now();
     let lastCount = previousCount;
     let lastChangeTime = Date.now();
@@ -310,9 +314,14 @@ class Fisher {
   async sendCommand(command) {
     console.log(`> ${command}`);
     const input = this.page.locator('[role="textbox"]').first();
-    await input.fill(command);
-    await input.press('Enter');
-    await input.press('Enter');
+
+    await input.click();
+    await input.fill('');
+    await input.type(command, {delay: 50});
+    await this.page.waitForTimeout(150);
+    await this.page.keyboard.press('Enter');
+    await this.page.waitForTimeout(100);
+    await this.page.keyboard.press('Enter');
   }
 
   /**
@@ -321,10 +330,16 @@ class Fisher {
   async sendCommandWithParams(command, params) {
     console.log(`> ${command} ${params}`);
     const input = this.page.locator('[role="textbox"]').first();
-    await input.fill(command);
-    await input.press('Enter');
-    await input.pressSequentially(params);
-    await input.press('Enter');
+
+    await input.click();
+    await input.fill('');
+    await input.type(command, {delay: 50});
+    await this.page.waitForTimeout(150);
+    await this.page.keyboard.press('Enter');
+    await this.page.waitForTimeout(100);
+    await input.type(params, {delay: 40});
+    await this.page.waitForTimeout(100);
+    await this.page.keyboard.press('Enter');
   }
 }
 
